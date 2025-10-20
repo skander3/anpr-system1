@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <script>
+// Vérifier mot de passe
+function checkPassword() {
+    const password = prompt("Entrez le mot de passe admin:");
+    if (password === "skander123") {
+        document.getElementById("admin-interface").style.display = "block";
+    } else {
+        alert("Accès refusé");
+        window.location.href = "about:blank";
+    }
+}
+// Appeler au chargement
+checkPassword();
+</script>
     <title>إدارة لوحات السيارات</title>
     <meta charset="utf-8">
     <style>
@@ -150,4 +164,5 @@
         }
     </script>
 </body>
+
 </html>
