@@ -1,212 +1,124 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="ar">
 <head>
-    <script>
-// Vérifier mot de passe
-function checkPassword() {
-    const password = prompt("Entrez le mot de passe admin:");
-    if (password === "skander123") {
-        document.getElementById("admin-interface").style.display = "block";
-    } else {
-        alert("Accès refusé");
-        window.location.href = "about:blank";
-    }
-}
-// Appeler au chargement
-checkPassword();
-</script>
-    <title>إدارة لوحات السيارات</title>
-    <meta charset="utf-8">
-    <style>
-        body {
-      background-color: #e7eddffe; /* غيّر هوني للون اللي تحب (hex) */
-      color: rgb(22, 1, 1);              /* لون النص العام في الصفحة */
-      font-family: Arial, sans-serif;
-    }
-        .section { border: 1px solid #160202; padding: 20px; margin: 20px 0; }
-        input, button { padding: 8px; margin: 5px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: right; }
-        th { background-color: #eaf5f2; }
-        .delete { color: rgb(162, 81, 81); cursor: pointer; }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ferme Ajeb - Plates Manager</title>
+  <style>
+    body { font-family: Arial; max-width:800px; margin:20px auto; padding:10px; }
+    input, button, select { padding:8px; font-size:16px; margin:2px; }
+    #platesList { margin-top:20px; }
+    .plate { display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee; }
+  </style>
 </head>
 <body>
-    <h1>🚗 إدارة لوحات السيارات المسموح لها</h1>
+  <h2>إدارة لوحات السيارات</h2>
 
-    <!-- قسم الإضافة -->
-    <div class="section" style="background-color: #abe5ed;">
-        <h2>➕ إضافة لوحة جديدة</h2>
-        <input type="text" id="plateNumber" placeholder="أدخل رقم اللوحة (مثال: 154 Tunis 1234)" style="width: 300px;">
-        <input type="text" id="ownerName" placeholder="اسم المالك" style="width: 200px;">
-        <button onclick="addPlate()">إضافة</button>
-    </div>
+  <form id="plateForm">
+    <input id="plateInput" placeholder="أدخل اللوحة مثال TN-1234" required>
+    <input id="ownerInput" placeholder="مالك السيارة (اختياري)">
+    <button type="submit">حفظ</button>
+  </form>
 
-    <!-- قسم العرض -->
-    <div class="section" style="background-color: #abe5ed;">
-        <h2>📋 اللوحات المسجلة</h2>
-        <table id="platesTable">
-            <thead>
-                <tr>
-                    <th>رقم اللوحة</th>
-                    <th>اسم المالك</th>
-                    <th>حذف</th>
-                </tr>
-            </thead>
-            <tbody id="platesBody">
-                <!-- هنا تظهر اللوحات -->
-            </tbody>
-        </table>
-    </div>
+  <div id="msg"></div>
 
-    <script>
-        // دالة لجلب اللوحات من الذاكرة
-        function getPlates() {
-            const plates = localStorage.getItem('carPlates');
-            return plates ? JSON.parse(plates) : [];
-        }
+  <div id="platesList">
+    <h3>قائمة اللوحات</h3>
+    <div id="list"></div>
+  </div>
 
-        // دالة لحفظ اللوحات في الذاكرة
-        function savePlates(plates) {
-            localStorage.setItem('carPlates', JSON.stringify(plates));
-        }
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getDatabase, ref, set, remove, onValue } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-database.js";
 
-        // دالة إضافة لوحة جديدة
-        function addPlate() {
-            const plateNumber = document.getElementById('plateNumber').value;
-            const ownerName = document.getElementById('ownerName').value;
+    // ---- ضع هنا firebaseConfig الخاص بك ----
+    const firebaseConfig = {
+      apiKey: "AIzaSyCZBzKpX75WWtsvxgH8CP3SsjdJ6Zq8Le4",
+      authDomain: "your-project.firebaseapp.com",
+      databaseURL: "https://project01-13a17-default-rtdb.firebaseio.com/",
+      projectId: "project01-13a17"
+    };
+    // ----------------------------------------
 
-            if (!plateNumber) {
-                alert('الرجاء إدخال رقم اللوحة');
-                return;
-            }
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
 
-            const plates = getPlates();
-            plates.push({
-                plate_number: plateNumber,
-                owner_name: ownerName,
-                date_added: new Date().toLocaleDateString('ar-TN')
-            });
+    const plateForm = document.getElementById('plateForm');
+    const plateInput = document.getElementById('plateInput');
+    const ownerInput = document.getElementById('ownerInput');
+    const msg = document.getElementById('msg');
+    const listEl = document.getElementById('list');
 
-            savePlates(plates);
-            displayPlates();
-            
-            // إفراغ الحقول بعد الإضافة
-            document.getElementById('plateNumber').value = '';
-            document.getElementById('ownerName').value = '';
-            
-            alert('تم إضافة اللوحة بنجاح!');
-        }
-
-        // دالة عرض اللوحات
-        function displayPlates() {
-            const plates = getPlates();
-            const platesBody = document.getElementById('platesBody');
-            
-            platesBody.innerHTML = '';
-
-            if (plates.length === 0) {
-                platesBody.innerHTML = '<tr><td colspan="3" style="text-align: center;">لا توجد لوحات مسجلة</td></tr>';
-                return;
-            }
-
-            plates.forEach((plate, index) => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${plate.plate_number}</td>
-                    <td>${plate.owner_name || '-'}</td>
-                    <td><span class="delete" onclick="deletePlate(${index})">🗑️ حذف</span></td>
-                `;
-                platesBody.appendChild(row);
-            });
-        }
-
-        // دالة حذف لوحة
-        function deletePlate(index) {
-            if (confirm('هل أنت متأكد من الحذف؟')) {
-                const plates = getPlates();
-                plates.splice(index, 1);
-                savePlates(plates);
-                displayPlates();
-                alert('تم الحذف بنجاح!');
-            }
-        }
-
-        // عرض اللوحات عند تحميل الصفحة
-        displayPlates();
-    </script>
-
-    <!-- قسم لمحاكاة عمل ESP32 -->
-    <div class="section" style="background-color: #abe5ed;">
-        <h2>🔧 محاكاة عمل النظام</h2>
-        <p>لاختبار النظام، أدخل رقم لوحة لترى إذا كانت مسجلة:</p>
-        <input type="text" id="testPlate" placeholder="أدخل رقم لوحة للاختبار" style="width: 300px;">
-        <button onclick="testPlate()">فحص اللوحة</button>
-        <p id="testResult" style="margin-top: 10px; font-weight: bold;"></p>
-    </div>
-
-    <script>
-        // دالة فحص اللوحة (محاكاة لعمل ESP32)
-        function testPlate() {
-            const testPlate = document.getElementById('testPlate').value;
-            const plates = getPlates();
-            const resultElement = document.getElementById('testResult');
-            
-            const found = plates.find(plate => plate.plate_number === testPlate);
-            
-            if (found) {
-                resultElement.innerHTML = `✅ مسموح بالدخول - مالك السيارة: ${found.owner_name || 'غير معروف'}`;
-                resultElement.style.color = 'green';
-            } else {
-                resultElement.innerHTML = '❌ ممنوع الدخول - اللوحة غير مسجلة';
-                resultElement.style.color = 'red';
-            }
-        }
-    </script>
-
-
-    <!-- Firebase SDK -->
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
-
-<script>
-  // إعدادات مشروع Firebase متاعك
-  const firebaseConfig = {
-    apiKey: "AIzaSyCZBzKpX75WWtsvxgH8CP3SsjdJ6Zq8Le4",
-    authDomain: "project01-13a17.firebaseapp.com",
-    databaseURL: "https://project01-13a17-default-rtdb.firebaseio.com",
-    projectId: "project01-13a17",
-  };
-
-  // تهيئة Firebase
-  firebase.initializeApp(firebaseConfig);
-  const db = firebase.database();
-
-  // نسمعو لأي بيانات جديدة (مثلاً من ESP32)
-  const detectionsRef = db.ref('detections'); // المسار اللي ESP32 يبعث فيه
-  detectionsRef.limitToLast(10).on('child_added', snapshot => {
-    const val = snapshot.val();
-    console.log('New detection:', val);
-
-    // نعرضها في الصفحة
-    const el = document.getElementById('last-detection');
-    if (el) {
-      el.innerHTML += `
-        <div style="padding:5px; border-bottom:1px solid #ccc;">
-          <b>لوحة:</b> ${val.plate || 'غير معروف'} 
-          — <b>Message:</b> ${val.msg || ''}
-        </div>`;
+    function sanitizeKey(p) {
+      return p.replace(/[.#$[\]]/g, '_').trim();
     }
-  });
-</script>
 
-<!-- مكان عرض آخر اللوحات -->
-<div id="last-detection" style="padding:10px; border:1px solid #ddd; margin-top:10px;">
-  لا توجد بيانات بعد...
-</div>
+    async function addPlate(plate, owner="") {
+      const key = sanitizeKey(plate);
+      const pRef = ref(db, `plates/${key}`);
+      const payload = { plate: plate, owner: owner, addedAt: Date.now() };
+      try {
+        await set(pRef, payload);
+        showMsg('تمت الإضافة: ' + plate, 'green');
+        plateInput.value = '';
+        ownerInput.value = '';
+      } catch(e) {
+        console.error(e);
+        showMsg('خطأ في الحفظ', 'red');
+      }
+    }
 
+    async function deletePlate(key) {
+      const pRef = ref(db, `plates/${key}`);
+      try {
+        await remove(pRef);
+        showMsg('تم الحذف', 'green');
+      } catch(e) {
+        console.error(e);
+        showMsg('خطأ في الحذف', 'red');
+      }
+    }
+
+    function showMsg(text, color='black') {
+      msg.textContent = text;
+      msg.style.color = color;
+      setTimeout(()=> msg.textContent = '', 3000);
+    }
+
+    plateForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const plate = plateInput.value.trim();
+      const owner = ownerInput.value.trim();
+      if(!plate) return showMsg('عطينا لوحة صحيحة', 'orange');
+      addPlate(plate, owner);
+    });
+
+    const platesRef = ref(db, 'plates');
+    onValue(platesRef, (snapshot) => {
+      const data = snapshot.val() || {};
+      listEl.innerHTML = '';
+      const keys = Object.keys(data).sort();
+      if(keys.length === 0) listEl.innerHTML = '<i>لا توجد لوحات</i>';
+      keys.forEach(k => {
+        const item = data[k];
+        const div = document.createElement('div');
+        div.className = 'plate';
+        div.innerHTML = `<div><strong>${item.plate}</strong> ${item.owner || ''}</div>
+                         <div><button data-key="${k}" class="delBtn">حذف</button></div>`;
+        listEl.appendChild(div);
+      });
+      document.querySelectorAll('.delBtn').forEach(b => {
+        b.onclick = () => {
+          const key = b.getAttribute('data-key');
+          if(confirm('تأكّد الحذف؟')) deletePlate(key);
+        };
+      });
+    });
+
+  </script>
 </body>
-
 </html>
+
+
 
 
